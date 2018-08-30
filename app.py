@@ -11,7 +11,7 @@ cluster = Cluster()
 app = Flask(__name__)
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-#http://127.0.0.1:5000/insert_id?epc=10198a853f71
+#http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/insert_id?epc=10198a853f71
 @app.route("/insert_id", methods=['GET', 'POST'])
 def insert_id():
 	session = cluster.connect('ci')
@@ -31,13 +31,32 @@ def insert_id():
 	insert = "INSERT INTO epc (epc, status) VALUES (%s, %s)"
 	r = session.execute(insert, [bytearray(request.args.get('epc'), 'utf8'), status])
 
-	return status
+	j = dict()
+	j['res']=status
+
+	return jsonify(j)
 
 
-#http://127.0.0.1:5000/unread
-@app.route("/unread", methods=['GET', 'POST'])
+#http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/delete_id?epc=10198a853f71
+@app.route("/delete_id", methods=['GET', 'POST'])
+def delete_id():
+	session = cluster.connect('ci')
+	session.set_keyspace("ci")
+	id = request.args.get('epc');
+
+	delete = "DELETE FROM epc WHERE epc=%s"
+	r = session.execute(delete, [bytearray(request.args.get('epc'), 'utf8')])
+
+	j = dict()
+	j['res']=r
+
+	return jsonify(j)
+
+
+#http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/notread
+@app.route("/notread", methods=['GET', 'POST'])
 @cross_origin(origin='localhost',headers=['Content- Type'])
-def unread():
+def notread():
 	
 	session = cluster.connect('ci')
 	session.set_keyspace("ci")
@@ -46,11 +65,13 @@ def unread():
 	p = session.execute(select)
 
 	if not p:
-		return "no entries in epc yet!"
+		j = dict()
+		j['res']="no entries to mark notread found"
+		return jsonify(j)
 
 	for obj in p:
 		insert = "INSERT INTO epc (epc, status) VALUES (%s, %s)"
-		r = session.execute(insert, [bytearray(obj.epc,'utf8'), 'unread'])
+		r = session.execute(insert, [bytearray(obj.epc,'utf8'), 'notread'])
 
 	j = dict()
 	j['res']='marked all as read'
@@ -58,7 +79,7 @@ def unread():
 	return jsonify(j)
 
 
-#http://127.0.0.1:5000/missing
+#http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/missing
 @app.route("/missing", methods=['GET', 'POST'])
 def missing():
 	session = cluster.connect('ci')
@@ -68,17 +89,22 @@ def missing():
 	p = session.execute(select)
 
 	if not p:
-		return "no entries in epc yet!"
+		j = dict()
+		j['res']="no missing entries found"
+		return jsonify(j)
 
 	a = []
 	for obj in p:
-		if(obj.status == 'unread'):
+		if(obj.status == 'notread'):
 			a.append(obj.epc);		
 
-	return " ".join(str(x) for x in a)
+	j = dict()
+	j['res']=" ".join(str(x) for x in a)
+
+	return jsonify(j)
 
 
-#http://127.0.0.1:5000/new
+#http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/new
 @app.route("/new", methods=['GET', 'POST'])
 def new():
 	session = cluster.connect('ci')
@@ -88,17 +114,22 @@ def new():
 	p = session.execute(select)
 
 	if not p:
-		return "no entries in epc yet!"
+		j = dict()
+		j['res']="no new entries found"
+		return jsonify(j)
 
 	a = []
 	for obj in p:
 		if(obj.status == 'new'):
 			a.append(obj.epc);		
 
-	return " ".join(str(x) for x in a)
+	j = dict()
+	j['res']=" ".join(str(x) for x in a)
+
+	return jsonify(j)
 
 
-#http://127.0.0.1:5000/old
+#http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/old
 @app.route("/old", methods=['GET', 'POST'])
 def old():
 	session = cluster.connect('ci')
@@ -108,14 +139,19 @@ def old():
 	p = session.execute(select)
 
 	if not p:
-		return "no entries in epc yet!"
+		j = dict()
+		j['res']="no old entries found"
+		return jsonify(j)
 
 	a = []
 	for obj in p:
 		if(obj.status == 'old'):
 			a.append(obj.epc);		
 
-	return " ".join(str(x) for x in a)
+	j = dict()
+	j['res']=" ".join(str(x) for x in a)
+
+	return jsonify(j)
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host="0.0.0.0", port=80)
