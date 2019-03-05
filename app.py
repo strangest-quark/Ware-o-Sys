@@ -14,26 +14,32 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 #http://ec2-54-212-43-165.us-west-2.compute.amazonaws.com/insert_id?epc=10198a853f71
 @app.route("/insert_id", methods=['GET', 'POST'])
 def insert_id():
+	#Connect to cassandra cluster
 	session = cluster.connect('ci')
+	#Set keyspace for tables
 	session.set_keyspace("ci")
+	#extract params from the request URL
 	id = request.args.get('epc');
 
+	#Database query to select row with the corresponding product ID given in params
 	select = "SELECT * FROM epc WHERE epc=%s"
 	p = session.execute(select,[bytearray(id,'utf8')])
 
 	print(not p)
 
+	#check for old or new product
 	status = "old"
 	if not p:
 		status = "new"
 
-
+	#Reinsert row into table with new status
 	insert = "INSERT INTO epc (epc, status) VALUES (%s, %s)"
 	r = session.execute(insert, [bytearray(request.args.get('epc'), 'utf8'), status])
 
 	j = dict()
 	j['res']=status
 
+	#return api response
 	return jsonify(j)
 
 
@@ -57,18 +63,22 @@ def delete_id():
 @app.route("/notread", methods=['GET', 'POST'])
 @cross_origin(origin='localhost',headers=['Content- Type'])
 def notread():
-	
+	#Connect to cassandra cluster
 	session = cluster.connect('ci')
+	#Set keyspace for tables
 	session.set_keyspace("ci")
 
+	#Query to select all products in database
 	select = "SELECT * FROM epc"
 	p = session.execute(select)
 
+	#if database empty
 	if not p:
 		j = dict()
 		j['res']="no entries to mark notread found"
 		return jsonify(j)
 
+	#mark all products as not-read
 	for obj in p:
 		insert = "INSERT INTO epc (epc, status) VALUES (%s, %s)"
 		r = session.execute(insert, [bytearray(obj.epc,'utf8'), 'notread'])
@@ -76,6 +86,7 @@ def notread():
 	j = dict()
 	j['res']='marked all as read'
 
+	#return api response
 	return jsonify(j)
 
 
